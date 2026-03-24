@@ -24,8 +24,8 @@ function initFoundedValuationScatter(canvasId, data) {
         backgroundColor: 'rgba(54, 162, 235, 0.65)',
         borderColor: 'rgba(54, 162, 235, 0.9)',
         borderWidth: 1,
-        pointRadius: 6,
-        pointHoverRadius: 9,
+        pointRadius: 4,
+        pointHoverRadius: 7,
       }],
     },
     options: {
@@ -58,13 +58,13 @@ function initFoundedValuationScatter(canvasId, data) {
             stepSize: 5,
             callback: value => (Number.isInteger(value) && value % 5 === 0 ? value : ''),
           },
-          grid: { color: 'rgba(0,0,0,0.06)' },
+          grid: { display: false },
         },
         y: {
           type: 'logarithmic',
           min: 1,
           max: 10000,
-          title: { display: true, text: 'Valuation (USD Billions, log scale)' },
+          title: { display: true, text: 'Valuation (USD Billions)' },
           ticks: {
             callback(value) {
               const match = LOG_TICKS.find(t => Math.abs(value - t) / t < 0.01);
@@ -72,7 +72,7 @@ function initFoundedValuationScatter(canvasId, data) {
               return match >= 1000 ? `$${match / 1000}T` : `$${match}B`;
             },
           },
-          grid: { color: 'rgba(0,0,0,0.06)' },
+          grid: { display: false },
         },
       },
     },

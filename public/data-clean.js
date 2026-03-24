@@ -38,20 +38,6 @@ function loadData(callback) {
         founded_year: parseInt(row['Founded Year'], 10) || null,
       }));
       callback(rows);
-      
-      // Parser sanity check - verify key companies have proper data
-      console.table(rows.map(r => ({ 
-        name: r['Company Name'], 
-        arr: r.arr_b, 
-        val: r.valuation_b, 
-        founded: r.founded_year, 
-        industry: r.Industry, 
-        investors: r['Top Investors'] 
-      })));
-      
-      // Currency parser edge cases
-      console.log(rows.filter(r => r.arr_b && r.valuation_b).length); // ~88
-      console.log(rows.filter(r => r.arr_b === null).map(r => r['Company Name'])); // should be small list
     },
   });
 }
