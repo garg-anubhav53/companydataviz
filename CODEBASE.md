@@ -14,14 +14,20 @@ A chat-driven data visualization tool. Type a natural-language prompt, get a cha
 
 ## Current State: Iteration 5
 
-Four charts, all driven by live CSV data:
+Four charts, all driven by live CSV data, with comprehensive data verification:
+
+### Recent Improvements
+- **Enhanced ARR vs Valuation chart** - Added reference lines at 5x, 10x, 20x, 50x multiples with improved labeling
+- **Data verification system** - Comprehensive validation of CSV parsing and chart data integrity
+- **Clean codebase** - Removed debug code and temporary files for production readiness
+- **Improved label positioning** - Fixed multiplier label cutoff issues with conservative positioning
 
 | chart_id      | Chart type     | Description                                |
 |---------------|----------------|--------------------------------------------|
 | `pie`         | Pie            | Industry breakdown — computed from CSV     |
 | `scatter`     | Scatter (log Y)| Founded year vs. valuation                 |
 | `investors`   | Horizontal bar | Top 15 investors by portfolio count        |
-| `arr-scatter` | Scatter (log)  | ARR vs. valuation, both axes log scale     |
+| `arr-scatter` | Scatter (log)  | ARR vs. valuation with reference lines (5x, 10x, 20x, 50x) |
 
 ---
 
@@ -33,12 +39,24 @@ companydataviz/
 ├── .env                               # ANTHROPIC_API_KEY (gitignored)
 ├── .env.example                       # Template for .env
 ├── package.json                       # npm config — "start": "node server.js"
-├── input_data/                        # Source CSV (not served directly)
+├── CODEBASE.md                        # This file
+├── Claude.md                          # System prompt and mental model
+├── README.md                          # Basic project info
+├── VERIFICATION_REPORT.md             # Data verification results
+├── data_verification.md               # SQL specifications (archived)
+├── iterative_specs/                   # Development specifications
+│   ├── add_llm_chat.md               # LLM integration spec
+│   ├── check_data_correctness.md     # Data verification tasks
+│   ├── hard_typed_investor_table.md  # Investor table spec
+│   ├── pie_first_spec.md              # Pie chart spec
+│   ├── scatter_second_spec.md         # Scatter chart spec
+│   └── use_source_data.md             # CSV migration spec
 └── public/                            # Everything served as static files
     ├── index.html                     # Chat UI shell
     ├── main.js                        # Chat logic, data loading, chart rendering
     ├── data.js                        # CSV loader + currency normalizer
-    ├── companies.csv                  # The dataset (copied from input_data/)
+    ├── data-verification.js           # Data verification tools
+    ├── companies.csv                  # The dataset
     ├── charts/
     │   ├── industryPie.js             # initIndustryPie(canvasId, data)
     │   ├── foundedValuationScatter.js # initFoundedValuationScatter(canvasId, data)
@@ -73,7 +91,7 @@ Claude is instructed to respond with only `{ "chart": "<id>", "title": "<descrip
 
 ### `public/data.js`
 
-Two exports:
+Two functions:
 
 **`parseCurrency(str)`** — normalizes all currency formats found in the CSV to a float in billions:
 - `$3T` → `3000`, `$270B` → `270`, `$400M` → `0.4`
@@ -117,7 +135,29 @@ Each chart function signature: `initXxx(canvasId, data)` — receives the full n
 | `industryPie.js` | `Industry` column | Buckets into top 5 + Other; computes counts dynamically |
 | `foundedValuationScatter.js` | `founded_year`, `valuation_b` | Filters `valuation_b > 0`; deterministic x-jitter via char sum |
 | `investorBar.js` | `Top Investors` column | Splits comma-separated investors, counts frequency, top 15 |
-| `arrValuationScatter.js` | `arr_b`, `valuation_b` | Filters both > 0; both axes logarithmic |
+| `arrValuationScatter.js` | `arr_b`, `valuation_b` | Filters both > 0; both axes logarithmic; reference lines at 5x, 10x, 20x, 50x multiples with enhanced labeling |
+
+---
+
+### `public/data-verification.js`
+
+Comprehensive data verification tools for validating CSV parsing and chart data integrity:
+- **Parser sanity checks** - Verifies key companies have proper data
+- **Per-chart spot checks** - Validates data requirements for each chart type
+- **Currency parser validation** - Tests edge cases in currency parsing
+- **Automated testing** - Can be run via browser console
+
+---
+
+## Data Verification
+
+The project includes comprehensive data verification to ensure CSV parsing and chart data integrity:
+
+- **VERIFICATION_REPORT.md** - Results of all verification checks
+- **data-verification.js** - Browser-based verification tools
+- **check_data_correctness.md** - Detailed verification requirements
+
+All verification checks pass, confirming data quality and parsing accuracy.
 
 ---
 
