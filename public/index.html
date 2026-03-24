@@ -46,6 +46,19 @@
     }
 
     #key-dot.connected { background: #4caf50; }
+    #key-dot.error     { background: #e53935; }
+
+    #test-key-btn {
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      color: #555;
+    }
+
+    #test-key-btn:hover { background: #f0f0f0; }
 
     #key-input {
       padding: 4px 8px;
@@ -148,6 +161,7 @@
       <div id="key-dot"></div>
       <span id="key-label">Checking API key…</span>
       <input id="key-input" type="password" placeholder="Paste Anthropic API key" style="display:none" />
+      <button id="test-key-btn" type="button" style="display:none">Test</button>
     </div>
   </header>
 

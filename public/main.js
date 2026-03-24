@@ -10,25 +10,56 @@ let canvasCounter = 0;   // ensures each canvas has a unique id
 
 // ── API key status ────────────────────────────────────────────────────────────
 
-async function checkKeyStatus() {
+async function testKey(apiKey) {
   const dot   = document.getElementById('key-dot');
   const label = document.getElementById('key-label');
-  const input = document.getElementById('key-input');
+
+  label.textContent = 'Testing key…';
+  dot.className = '';
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-api-key'] = apiKey;
+
+  try {
+    const { ok, error } = await fetch('/api/test-key', { headers }).then(r => r.json());
+    if (ok) {
+      dot.classList.add('connected');
+      label.textContent = 'API key verified';
+    } else {
+      dot.classList.add('error');
+      label.textContent = `Key invalid: ${error}`;
+    }
+  } catch {
+    dot.classList.add('error');
+    label.textContent = 'Could not reach server.';
+  }
+}
+
+async function checkKeyStatus() {
+  const dot     = document.getElementById('key-dot');
+  const label   = document.getElementById('key-label');
+  const input   = document.getElementById('key-input');
+  const testBtn = document.getElementById('test-key-btn');
 
   const { hasKey } = await fetch('/api/key-status').then(r => r.json());
 
   if (hasKey) {
-    dot.classList.add('connected');
-    label.textContent = 'API key loaded';
+    // Key is in .env — test it automatically
+    await testKey(null);
   } else {
+    dot.className = '';
     label.textContent = 'No API key —';
     input.style.display = 'inline';
-    input.addEventListener('change', () => {
+    testBtn.style.display = 'inline';
+
+    testBtn.addEventListener('click', async () => {
       userApiKey = input.value.trim();
-      if (userApiKey) {
-        dot.classList.add('connected');
-        label.textContent = 'API key set';
+      if (!userApiKey) return;
+      await testKey(userApiKey);
+      const dot = document.getElementById('key-dot');
+      if (dot.classList.contains('connected')) {
         input.style.display = 'none';
+        testBtn.style.display = 'none';
       }
     });
   }

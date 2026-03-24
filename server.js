@@ -22,6 +22,41 @@ app.get('/api/key-status', (req, res) => {
   res.json({ hasKey: !!process.env.ANTHROPIC_API_KEY });
 });
 
+// Makes a minimal real API call to verify the key is valid and has access.
+app.get('/api/test-key', async (req, res) => {
+  const apiKey = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return res.status(400).json({ ok: false, error: 'No API key provided.' });
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.json({ ok: false, error: data.error?.message || 'Invalid API key.' });
+    }
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ ok: false, error: 'Could not reach Anthropic API.' });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   const apiKey = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY;
 
