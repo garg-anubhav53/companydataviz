@@ -4,7 +4,7 @@ A running log of how this project is structured and how each piece works. Update
 
 ---
 
-## Current State: Iteration 2 — Tabbed Interface with Pie + Scatter Charts
+## Current State: Iteration 2b — Scatter Chart Polish + Edge Case Hardening
 
 ### What This Does
 
@@ -75,14 +75,28 @@ Exposes one function: `initIndustryPie(canvasId)`.
 ### `charts/foundedValuationScatter.js`
 Exposes one function: `initFoundedValuationScatter(canvasId)`.
 
-- Contains 88 company data points as `{ x: foundedYear, y: valuationBillions, label: name }`
+- Contains 88 company data points stored as `RAW_DATA` with `{ x, y, label }`
+- Filters and transforms `RAW_DATA` into `DATA` before passing to Chart.js
 - Calls `new Chart(...)` with `type: 'scatter'`
 - Returns the Chart instance
 
-Key details:
-- **Y-axis is logarithmic** (`type: 'logarithmic'`) — the valuation range spans $1.1B to $3,000B; a linear scale would collapse 80% of dots to the bottom
-- **Tick filtering** — Chart.js generates many intermediate ticks on log scales; the `ticks.callback` only labels $1B, $10B, $100B, $1000B to avoid clutter
-- **Custom tooltips** — `ctx.raw.label` accesses the company name from each data point; Chart.js scatter ignores extra fields on `{x, y}` objects but they're accessible in callbacks
+**Data pipeline (RAW_DATA → DATA):**
+1. **Filter invalid points** — drops any entry where `y` is null, non-finite, or `≤ 0`. Log scale is undefined at zero; bad data would crash the chart silently.
+2. **Deterministic x-jitter** — many companies share the same founding year (e.g., 12 founded in 2011), which stacks dots directly on top of each other. A `charSum()` function sums the char codes of the company name and uses the result to offset x by up to ±0.3 years. This is deterministic (same label → same offset every render) so the chart doesn't shift on reload.
+3. **Preserve original year** — jittered `x` is used for positioning; original `year` is stored separately for display in tooltips.
+
+**Y-axis (logarithmic):**
+- `min: 1, max: 10000` explicitly set — prevents Chart.js from auto-choosing a min below 1, which was causing a spurious `$1` label at the bottom without the `B` suffix
+- Tick callback uses a **floating-point safe** check (`Math.abs(value - t) / t < 0.01`) instead of strict equality — Chart.js generates log-scale ticks as floats that may not exactly equal 1, 10, 100, etc.
+- Ticks labeled: `$1B`, `$10B`, `$100B`, `$1T` (Microsoft's ~$3T sits within the $1T–$10T band)
+
+**X-axis:**
+- `min: 1969, max: 2021` provides margin so edge companies (SAP 1972, Ramp 2019) aren't flush against the axis
+- Tick callback only labels multiples of 5 — suppresses fractional-year ticks that the jitter offsets can create
+
+**Legend:** disabled (`display: false`) — redundant with the chart title.
+
+**Tooltips:** format valuation as `$3T` for values ≥ 1000B, `$85B` otherwise. Shows company name, valuation, and original (un-jittered) founding year.
 
 ---
 
@@ -96,6 +110,9 @@ Key details:
 | `scatter.html` standalone | Quick isolated verification without the tab layer in the way |
 | `charts/` directory | Each chart owns its own file; adding a new chart = adding a new file here |
 | CDN for Chart.js | No build step; files open directly by double-clicking |
+| RAW_DATA → DATA pipeline in scatter | Separates source data from display data; makes it easy to add more transforms (filtering, normalization) as the project grows |
+| Deterministic jitter via charSum | Avoids `Math.random()` so the chart renders identically on every load — random jitter would move dots around each refresh |
+| Floating-point safe tick callback | `value === 1` fails silently on log scales because Chart.js emits `0.9999...` or `1.000...1`; relative tolerance check is robust regardless of float precision |
 
 ---
 

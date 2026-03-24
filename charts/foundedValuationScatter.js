@@ -1,5 +1,5 @@
 function initFoundedValuationScatter(canvasId) {
-  const DATA = [
+  const RAW_DATA = [
     { x: 1972, y: 215.0,  label: "SAP" },
     { x: 1975, y: 3000.0, label: "Microsoft" },
     { x: 1977, y: 350.0,  label: "Oracle" },
@@ -90,30 +90,59 @@ function initFoundedValuationScatter(canvasId) {
     { x: 2019, y: 8.1,    label: "Ramp" }
   ];
 
+  // Drop any points that would break a log scale (y must be > 0)
+  const DATA = RAW_DATA
+    .filter(d => d.y != null && isFinite(d.y) && d.y > 0)
+    .map(d => ({
+      // Add a small deterministic x-jitter per company to separate dots stacked
+      // on the same founding year. Jitter is ±0.35 based on label character sum
+      // so it stays stable across renders (not random each load).
+      x: d.x + (charSum(d.label) % 7 - 3) * 0.1,
+      y: d.y,
+      label: d.label,
+      year: d.x   // preserve original year for tooltip
+    }));
+
+  // Simple deterministic jitter: sum of char codes mod N
+  function charSum(str) {
+    return str.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  }
+
+  // Log-scale tick values we want labeled
+  const LOG_TICKS = [1, 10, 100, 1000, 10000];
+
   return new Chart(document.getElementById(canvasId), {
     type: 'scatter',
     data: {
       datasets: [{
         label: 'SaaS Companies',
         data: DATA,
-        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+        backgroundColor: 'rgba(54, 162, 235, 0.65)',
+        borderColor: 'rgba(54, 162, 235, 0.9)',
+        borderWidth: 1,
         pointRadius: 6,
         pointHoverRadius: 9
       }]
     },
     options: {
       responsive: true,
+      animation: false,
       plugins: {
         title: {
           display: true,
           text: 'Founded Year vs. Valuation — Top 100 SaaS Companies',
-          font: { size: 16 }
+          font: { size: 15, weight: 'bold' },
+          padding: { bottom: 16 }
         },
+        legend: { display: false },  // redundant with the title
         tooltip: {
           callbacks: {
             label: function(ctx) {
               const pt = ctx.raw;
-              return `${pt.label}: $${pt.y}B (${pt.x})`;
+              const valuation = pt.y >= 1000
+                ? `$${(pt.y / 1000).toFixed(1)}T`
+                : `$${pt.y}B`;
+              return `${pt.label} — ${valuation} (founded ${pt.year})`;
             }
           }
         }
@@ -121,17 +150,32 @@ function initFoundedValuationScatter(canvasId) {
       scales: {
         x: {
           title: { display: true, text: 'Founded Year' },
-          ticks: { stepSize: 5 }
+          min: 1969,
+          max: 2021,
+          ticks: {
+            stepSize: 5,
+            // Only label clean 5-year multiples; skip jitter-fractional ticks
+            callback: function(value) {
+              return Number.isInteger(value) && value % 5 === 0 ? value : '';
+            }
+          },
+          grid: { color: 'rgba(0,0,0,0.06)' }
         },
         y: {
           type: 'logarithmic',
-          title: { display: true, text: 'Valuation (USD Billions)' },
+          min: 1,
+          max: 10000,
+          title: { display: true, text: 'Valuation (USD Billions, log scale)' },
           ticks: {
             callback: function(value) {
-              if ([1, 10, 100, 1000].includes(value)) return '$' + value + 'B';
-              return '';
+              // Floating-point safe: check if value rounds to a labeled tick
+              const match = LOG_TICKS.find(t => Math.abs(value - t) / t < 0.01);
+              if (!match) return '';
+              if (match >= 1000) return '$' + (match / 1000) + 'T';
+              return '$' + match + 'B';
             }
-          }
+          },
+          grid: { color: 'rgba(0,0,0,0.06)' }
         }
       }
     }
