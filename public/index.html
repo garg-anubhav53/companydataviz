@@ -5,153 +5,240 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SaaS Company Data Viz</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #F0F4F8;
+      --surface:     #FFFFFF;
+      --border:      #E2E8F0;
+      --text-1:      #0F172A;
+      --text-2:      #64748B;
+      --text-3:      #94A3B8;
+      --accent:      #4E79A7;
+      --accent-hover:#3D6389;
+      --accent-fg:   #FFFFFF;
+      --green:       #22C55E;
+      --red:         #EF4444;
+      --radius-s:    6px;
+      --radius-m:    12px;
+      --radius-l:    20px;
+      --shadow-s:    0 1px 2px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.08);
+      --shadow-m:    0 4px 16px rgba(15,23,42,0.08), 0 1px 4px rgba(15,23,42,0.05);
+      --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background: #f5f5f5;
-      font-family: sans-serif;
+      background: var(--bg);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-1);
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Header ── */
+    /* ── Header ─────────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 20px;
-      background: white;
-      border-bottom: 1px solid #e0e0e0;
+      padding: 0 24px;
+      height: 54px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-s);
+      z-index: 10;
     }
 
     header h1 {
-      font-size: 1rem;
-      color: #333;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-1);
     }
 
     #key-status {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.8rem;
-      color: #666;
+      font-size: 12px;
+      color: var(--text-2);
     }
 
     #key-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: #ccc;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.2s;
     }
-
-    #key-dot.connected { background: #4caf50; }
-    #key-dot.error     { background: #e53935; }
-
-    #test-key-btn {
-      padding: 3px 10px;
-      font-size: 0.75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: white;
-      cursor: pointer;
-      color: #555;
-    }
-
-    #test-key-btn:hover { background: #f0f0f0; }
+    #key-dot.connected { background: var(--green); }
+    #key-dot.error     { background: var(--red); }
 
     #key-input {
-      padding: 4px 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      width: 260px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      font-size: 12px;
+      font-family: var(--font);
+      width: 230px;
+      background: var(--bg);
+      color: var(--text-1);
+      outline: none;
+      transition: border-color 0.15s;
     }
+    #key-input:focus { border-color: var(--accent); background: var(--surface); }
 
-    /* ── Chat messages ── */
+    #test-key-btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      background: var(--surface);
+      cursor: pointer;
+      color: var(--text-2);
+      transition: background 0.15s, color 0.15s;
+    }
+    #test-key-btn:hover { background: var(--bg); color: var(--text-1); }
+
+    /* ── Chat feed ───────────────────────────────────────── */
     #chat-messages {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 28px 24px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
+      scroll-behavior: smooth;
     }
+
+    #chat-messages::-webkit-scrollbar { width: 4px; }
+    #chat-messages::-webkit-scrollbar-track { background: transparent; }
+    #chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
     .msg {
-      max-width: 720px;
+      max-width: min(680px, 100%);
       width: 100%;
     }
-
-    .msg.user { align-self: flex-end; }
+    .msg.user      { align-self: flex-end; }
     .msg.assistant { align-self: flex-start; }
 
     .msg-bubble {
       display: inline-block;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      line-height: 1.4;
+      padding: 10px 15px;
+      font-size: 13.5px;
+      line-height: 1.55;
     }
 
+    /* User bubble — solid accent, rounded with a pinched bottom-right corner */
     .msg.user .msg-bubble {
-      background: #4e79a7;
-      color: white;
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-radius: var(--radius-m) var(--radius-m) 4px var(--radius-m);
     }
 
+    /* Assistant bubble — white card, pinched bottom-left */
     .msg.assistant .msg-bubble {
-      background: white;
-      color: #333;
-      border: 1px solid #e0e0e0;
+      background: var(--surface);
+      color: var(--text-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-m) var(--radius-m) var(--radius-m) 4px;
+      box-shadow: var(--shadow-s);
     }
 
+    /* Caption above chart cards */
     .msg-caption {
-      font-size: 0.85rem;
-      color: #555;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-2);
       margin-bottom: 8px;
-      font-style: italic;
+      padding-left: 2px;
     }
 
     .chart-wrapper {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 20px;
+      background: var(--surface);
+      border-radius: var(--radius-m);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-m);
+      padding: 20px 20px 16px;
       width: 100%;
-      max-width: 720px;
+      max-width: min(680px, 100%);
     }
 
-    /* ── Input bar ── */
+    /* ── Input bar ───────────────────────────────────────── */
     #chat-form {
       display: flex;
       gap: 8px;
-      padding: 12px 20px;
-      background: white;
-      border-top: 1px solid #e0e0e0;
+      padding: 12px 24px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
     }
 
     #chat-input {
       flex: 1;
-      padding: 10px 14px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      min-width: 0;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      font-size: 13.5px;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-1);
       outline: none;
+      transition: border-color 0.15s, background 0.15s;
     }
-
-    #chat-input:focus { border-color: #4e79a7; }
+    #chat-input::placeholder { color: var(--text-3); }
+    #chat-input:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
 
     #send-btn {
-      padding: 10px 20px;
-      background: #4e79a7;
-      color: white;
+      flex-shrink: 0;
+      padding: 10px 22px;
+      background: var(--accent);
+      color: var(--accent-fg);
       border: none;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      border-radius: var(--radius-l);
+      font-size: 13.5px;
+      font-family: var(--font);
+      font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s;
+    }
+    #send-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    #send-btn:disabled { background: var(--border); color: var(--text-3); cursor: default; }
+
+    /* ── Typing indicator ────────────────────────────────── */
+    .typing-dots { display: inline-flex; gap: 4px; align-items: center; padding: 2px 0; }
+    .typing-dots span {
+      display: block; width: 6px; height: 6px;
+      background: var(--text-3); border-radius: 50%;
+      animation: tdot 1.2s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes tdot {
+      0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+      30%           { transform: translateY(-5px); opacity: 1;   }
     }
 
-    #send-btn:disabled { background: #aaa; cursor: default; }
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 600px) {
+      header          { padding: 0 16px; }
+      #key-input      { width: 150px; }
+      #chat-messages  { padding: 16px 14px; }
+      #chat-form      { padding: 10px 14px; }
+      #send-btn       { padding: 10px 16px; }
+    }
   </style>
 </head>
 <body>
@@ -168,7 +255,7 @@
   <div id="chat-messages"></div>
 
   <form id="chat-form">
-    <input id="chat-input" type="text" placeholder="Ask about the data — e.g. 'show me the industry breakdown'" autocomplete="off" />
+    <input id="chat-input" type="text" placeholder="Ask about the data — e.g. 'show me the industry breakdown'" autocomplete="off" autofocus />
     <button id="send-btn" type="submit">Send</button>
   </form>
 

@@ -28,6 +28,12 @@ function initIndustryPie(canvasId, data) {
           font: { size: 16 },
         },
         legend: { position: 'right' },
+        tooltip: {
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          titleColor: 'white',
+          bodyColor: 'white',
+          padding: 8,
+        },
       },
     },
   });

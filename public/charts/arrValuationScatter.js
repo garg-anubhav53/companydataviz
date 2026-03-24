@@ -29,9 +29,6 @@ function initArrValuationScatter(canvasId, data) {
   const slope     = logX.reduce((s, x, i) => s + (x - mX) * (logY[i] - mY), 0)
                   / logX.reduce((s, x)    => s + (x - mX) ** 2, 0);
   const intercept = mY - slope * mX;
-  const ssRes     = logY.reduce((s, y, i) => s + (y - (slope * logX[i] + intercept)) ** 2, 0);
-  const ssTot     = logY.reduce((s, y)    => s + (y - mY) ** 2, 0);
-  const rSquared  = 1 - ssRes / ssTot;
   const xMin = Math.min(...DATA.map(d => d.x));
   const xMax = Math.max(...DATA.map(d => d.x));
   const regressionData = [xMin, xMax].map(x => ({ x, y: Math.pow(10, slope * Math.log10(x) + intercept) }));
@@ -58,7 +55,7 @@ function initArrValuationScatter(canvasId, data) {
     }));
 
   // Revenue multiple reference lines — the key analytical signal on this chart
-  const MULTIPLES = [5, 10, 20, 50];
+  const MULTIPLES = [10, 50];
   const X_MIN = 0.1, X_MAX = 1000, Y_MIN = 1, Y_MAX = 10000;
 
   function multipleLinePoints(k) {
@@ -68,7 +65,7 @@ function initArrValuationScatter(canvasId, data) {
   }
 
   const multipleDatasets = MULTIPLES.map((k) => {
-    const isImportant = k === 10 || k === 20;
+    const isImportant = k === 10;
     return {
       label: `_multiple_${k}x`,
       data: multipleLinePoints(k),
@@ -95,7 +92,7 @@ function initArrValuationScatter(canvasId, data) {
       const px = xScale.getPixelForValue(X_LABEL);
 
       MULTIPLES.forEach(k => {
-        const isImportant = k === 10 || k === 20;
+        const isImportant = k === 10;
         ctx.font = isImportant ? 'bold 10px sans-serif' : '10px sans-serif';
         ctx.fillStyle = isImportant ? 'rgba(30,30,30,0.85)' : 'rgba(80,80,80,0.6)';
         ctx.fillText(`${k}x`, px + 5, yScale.getPixelForValue(k * X_LABEL));

@@ -40,6 +40,11 @@ function initFoundedValuationScatter(canvasId, data) {
         },
         legend: { display: false },
         tooltip: {
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          titleColor: 'white',
+          bodyColor: 'white',
+          padding: 8,
+          displayColors: false,
           callbacks: {
             label(ctx) {
               const { label, y, year } = ctx.raw;

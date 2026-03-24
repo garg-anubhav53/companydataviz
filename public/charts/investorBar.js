@@ -52,12 +52,17 @@ function initInvestorBar(canvasId, data) {
       plugins: {
         title: {
           display: true,
-          text: 'Most Frequent Investors Across Top 100 SaaS Companies',
+          text: 'Investor Concentration — Top 100 SaaS Companies',
           font: { size: 15, weight: 'bold' },
           padding: { bottom: 16 },
         },
         legend: { display: false },
         tooltip: {
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          titleColor: 'white',
+          bodyColor: 'white',
+          padding: 8,
+          displayColors: false,
           callbacks: {
             afterBody(tooltipItems) {
               const inv = labels[tooltipItems[0].dataIndex];

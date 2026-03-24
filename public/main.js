@@ -108,6 +108,17 @@ function resolveLookup(company, field, data) {
 
 // ── Chat rendering ────────────────────────────────────────────────────────────
 
+function appendTyping() {
+  const feed = document.getElementById('chat-messages');
+  const el   = document.createElement('div');
+  el.className = 'msg assistant';
+  el.id = '_typing';
+  el.innerHTML = '<div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  feed.appendChild(el);
+  feed.scrollTop = feed.scrollHeight;
+  return el;
+}
+
 function appendMessage(role, text) {
   const feed = document.getElementById('chat-messages');
   const msg  = document.createElement('div');
@@ -137,6 +148,7 @@ function appendChart(chartId, title) {
 
 async function sendMessage(prompt) {
   appendMessage('user', prompt);
+  const typing = appendTyping();
 
   const btn = document.getElementById('send-btn');
   btn.disabled = true;
@@ -152,6 +164,7 @@ async function sendMessage(prompt) {
     });
 
     const data = await res.json();
+    typing.remove();
 
     if (data.error) {
       appendMessage('assistant', `Error: ${data.error}`);
@@ -167,6 +180,7 @@ async function sendMessage(prompt) {
       appendChart(data.chart, data.title);
     }
   } catch {
+    typing.remove();
     appendMessage('assistant', 'Something went wrong. Please try again.');
   } finally {
     btn.disabled = false;
@@ -176,7 +190,19 @@ async function sendMessage(prompt) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Align Chart.js font with the app's system font stack
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+  Chart.defaults.font.size   = 12;
+  Chart.defaults.color       = '#64748B';
+
   checkKeyStatus();
+
+  // Welcome message — orients the user to available capabilities
+  appendMessage('assistant',
+    'Ask me anything about the top 100 SaaS companies.<br><br>' +
+    '<em>"Show industry breakdown"</em> &nbsp;·&nbsp; <em>"ARR vs valuation"</em> &nbsp;·&nbsp; ' +
+    '<em>"Top investors"</em> &nbsp;·&nbsp; <em>"What is Stripe\'s valuation?"</em>'
+  );
 
   // Pre-load CSV data in the background so first chart render is instant
   withData(() => {});
