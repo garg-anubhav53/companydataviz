@@ -12,22 +12,25 @@ A chat-driven data visualization tool. Type a natural-language prompt, get a cha
 
 ---
 
-## Current State: Iteration 5
+## Current State: Iteration 9
 
-Four charts, all driven by live CSV data, with comprehensive data verification:
+Four charts, company lookups, and ranked queries, all driven by live CSV data with modern UI:
 
 ### Recent Improvements
-- **Enhanced ARR vs Valuation chart** - Added reference lines at 5x, 10x, 20x, 50x multiples with improved labeling
-- **Data verification system** - Comprehensive validation of CSV parsing and chart data integrity
-- **Clean codebase** - Removed debug code and temporary files for production readiness
-- **Improved label positioning** - Fixed multiplier label cutoff issues with conservative positioning
+- **Natural language queries** - Ranked and filtered company lists (e.g., "top 5 by ARR multiple")
+- **Visual polish** - Modern UI with CSS variables, typing indicators, smooth interactions
+- **Enhanced ARR scatter** - Industry color coding, regression line, improved tooltips
+- **Company lookups** - Direct field queries for specific companies
+- **Clean architecture** - Removed debug files, improved error handling
 
-| chart_id      | Chart type     | Description                                |
+| chart_id      | Type           | Description                                |
 |---------------|----------------|--------------------------------------------|
 | `pie`         | Pie            | Industry breakdown — computed from CSV     |
 | `scatter`     | Scatter (log Y)| Founded year vs. valuation                 |
 | `investors`   | Horizontal bar | Top 15 investors by portfolio count        |
-| `arr-scatter` | Scatter (log)  | ARR vs. valuation with reference lines (5x, 10x, 20x, 50x) |
+| `arr-scatter` | Scatter (log)  | ARR vs. valuation with industry colors + regression |
+| `lookup`      | Text response  | Company-specific field queries             |
+| `query`       | Text response  | Ranked/filtered company lists               |
 
 ---
 
@@ -45,12 +48,15 @@ companydataviz/
 ├── VERIFICATION_REPORT.md             # Data verification results
 ├── data_verification.md               # SQL specifications (archived)
 ├── iterative_specs/                   # Development specifications
-│   ├── add_llm_chat.md               # LLM integration spec
-│   ├── check_data_correctness.md     # Data verification tasks
-│   ├── hard_typed_investor_table.md  # Investor table spec
-│   ├── pie_first_spec.md              # Pie chart spec
-│   ├── scatter_second_spec.md         # Scatter chart spec
-│   └── use_source_data.md             # CSV migration spec
+│   ├── 1.pie_chart_spec.md             # Pie chart spec
+│   ├── 2.scatter_chart_spec.md        # Scatter chart spec
+│   ├── 3.hard_typed_investor_table.md # Investor table spec
+│   ├── 4.add_llm_chat.md              # LLM integration spec
+│   ├── 5.check_data_correctness.md    # Data verification tasks
+│   ├── 6.use_source_data.md           # CSV migration spec
+│   ├── 7.Improve_ARR_evaluation_compare.md # ARR enhancements
+│   ├── 8.auto_gen_chart_insight.md    # Visual polish
+│   └── 9.natural_language_query_extension.md # Query functionality
 └── public/                            # Everything served as static files
     ├── index.html                     # Chat UI shell
     ├── main.js                        # Chat logic, data loading, chart rendering
@@ -83,11 +89,16 @@ npm start                 # http://localhost:3000
 Three routes:
 - **`GET /api/key-status`** — returns `{ hasKey: bool }` so the UI knows whether to show the key input.
 - **`GET /api/test-key`** — makes a real 1-token ping to Anthropic (using Haiku) to verify the key actually works, not just that it exists.
-- **`POST /api/chat`** — takes `{ message }`, calls Claude with the routing system prompt, returns `{ chart, title }`.
+- **`POST /api/chat`** — takes `{ message }`, calls Claude with the routing system prompt, returns chart/lookup/query response.
 
 API key priority: `req.headers['x-api-key']` (user-pasted) → `process.env.ANTHROPIC_API_KEY` (.env).
 
-Claude is instructed to respond with only `{ "chart": "<id>", "title": "<description>" }`. `max_tokens: 100` keeps costs minimal.
+Claude responds with:
+- Charts: `{ "chart": "<id>", "title": "<description>" }`
+- Lookups: `{ "chart": "lookup", "company": "<name>", "field": "<field>" }`
+- Queries: `{ "chart": "query", "sort_by": "<field>", "order": "asc|desc", "limit": 3, "filter": {...} }`
+
+`max_tokens: 100` keeps costs minimal.
 
 ### `public/data.js`
 
@@ -111,11 +122,15 @@ Rows with bad values are **not dropped** — callers filter as needed per chart.
 
 **API key:** On load, checks `/api/key-status`. If no key, shows input + Test button. Test button hits `/api/test-key` — green dot on success, red on failure.
 
-**Chat flow:** User submits prompt → POST `/api/chat` → parse `{ chart, title }` → if unknown chart, show title as text → otherwise call `appendChart()`.
+**Chat flow:** User submits prompt → POST `/api/chat` → parse response → route to appropriate handler:
+- Charts → `appendChart()` with fresh canvas
+- Lookups → `resolveLookup()` → formatted text
+- Queries → `resolveQuery()` → ranked/filtered lists
+- Unknown → show title as plain text
 
-**Chart rendering:** Each chart response creates a fresh `<canvas>` with a unique ID (`chart-1`, `chart-2`, …). Chart.js binds to a canvas permanently — reusing canvases causes ghost artifacts. `withData()` ensures the CSV is ready before the init function is called.
+**Chart rendering:** Each chart response creates a fresh `<canvas>` with a unique ID (`chart-1`, `chart-2`, …). Chart.js binds to a canvas permanently — reusing canvases causes ghost artifacts.
 
-**`CHARTS` map:**
+**Response types:**
 ```javascript
 const CHARTS = {
   pie:           { init: (id, data) => initIndustryPie(id, data) },
@@ -124,7 +139,10 @@ const CHARTS = {
   'arr-scatter': { init: (id, data) => initArrValuationScatter(id, data) },
 };
 ```
-Adding a new chart = new entry here + new file in `public/charts/`.
+
+**Lookup function:** `resolveLookup(company, field, data)` returns formatted company data (valuation, ARR, investors, etc.)
+
+**Query function:** `resolveQuery(params, data)` handles ranked/filtered lists with sorting, limits, and optional filters.
 
 ### `public/charts/*.js`
 
@@ -135,7 +153,7 @@ Each chart function signature: `initXxx(canvasId, data)` — receives the full n
 | `industryPie.js` | `Industry` column | Buckets into top 5 + Other; computes counts dynamically |
 | `foundedValuationScatter.js` | `founded_year`, `valuation_b` | Filters `valuation_b > 0`; deterministic x-jitter via char sum |
 | `investorBar.js` | `Top Investors` column | Splits comma-separated investors, counts frequency, top 15 |
-| `arrValuationScatter.js` | `arr_b`, `valuation_b` | Filters both > 0; both axes logarithmic; reference lines at 5x, 10x, 20x, 50x multiples with enhanced labeling |
+| `arrValuationScatter.js` | `arr_b`, `valuation_b`, `Industry` | Filters both > 0; industry color coding; logarithmic scales; regression line; revenue multiple reference lines |
 
 ---
 
@@ -171,3 +189,6 @@ All verification checks pass, confirming data quality and parsing accuracy.
 | LLM call server-side only | Anthropic API blocks browser requests via CORS |
 | Fresh canvas per chat response | Chart.js permanently binds to a canvas element |
 | `max_tokens: 100` on routing call | Response is always a small JSON object |
+| Text responses for lookups/queries | Faster than charts for simple data requests |
+| CSS variables for theming | Consistent design system with easy customization |
+| Typing indicators for UX | Better feedback during LLM processing |

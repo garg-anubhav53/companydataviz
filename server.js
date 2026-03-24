@@ -18,9 +18,15 @@ The available chart_ids are:
 - "lookup" — a specific fact about one company; use this shape instead:
   {"chart": "lookup", "company": "<name from the user's question>", "field": "<field>"}
   Valid fields: valuation, arr, investors, industry, hq, employees, funding, founded, product, g2_rating
+- "query" — ranked or filtered list across companies; use this shape instead:
+  {"chart": "query", "sort_by": "<field>", "order": "asc|desc", "limit": 3, "filter": {"field": "<csv_field>", "contains": "<value>"}}
+  filter is optional. Valid sort_by: valuation, arr, arr_multiple, founded, employees, g2_rating
+  Examples:
+  "top 5 by ARR multiple" → {"chart": "query", "sort_by": "arr_multiple", "order": "desc", "limit": 5}
+  "highest valuation companies with Sequoia" → {"chart": "query", "sort_by": "valuation", "order": "desc", "limit": 3, "filter": {"field": "Top Investors", "contains": "Sequoia"}}
 
-Pick the chart_id that best matches the user's request. If the request doesn't match any chart or lookup, respond with:
-{"chart": "none", "title": "I can show you: industry breakdown, founded year vs valuation, ARR vs valuation, top investors, or look up a fact about a specific company."}`;
+Pick the chart_id that best matches the user's request. If the request doesn't match any chart, lookup, or query, respond with:
+{"chart": "none", "title": "I can show you: industry breakdown, founded year vs valuation, ARR vs valuation, top investors, look up a fact about a specific company, or rank companies by valuation, ARR, ARR multiple, founding year, employees, or G2 rating."}`;
 
 app.get('/api/key-status', (req, res) => {
   res.json({ hasKey: !!process.env.ANTHROPIC_API_KEY });

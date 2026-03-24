@@ -106,6 +106,63 @@ function resolveLookup(company, field, data) {
   }
 }
 
+// ── Query resolver ────────────────────────────────────────────────────────────
+
+function resolveQuery(params, data) {
+  const { sort_by, order = 'desc', limit = 3, filter } = params;
+
+  function fmtB(b) {
+    if (b >= 1000) return `$${(b / 1000).toFixed(1)}T`;
+    if (b >= 1)    return `$${b.toFixed(0)}B`;
+    return `$${(b * 1000).toFixed(0)}M`;
+  }
+
+  function getValue(row, field) {
+    switch (field) {
+      case 'valuation':    return row.valuation_b;
+      case 'arr':          return row.arr_b;
+      case 'arr_multiple': return (row.arr_b > 0 && row.valuation_b > 0) ? row.valuation_b / row.arr_b : null;
+      case 'founded':      return row.founded_year;
+      case 'employees':    return parseInt((row['Employees'] || '').replace(/,/g, ''), 10) || null;
+      case 'g2_rating':    return parseFloat(row['G2 Rating']) || null;
+      default:             return null;
+    }
+  }
+
+  function fmtValue(field, val) {
+    switch (field) {
+      case 'valuation':
+      case 'arr':          return fmtB(val);
+      case 'arr_multiple': return `${val.toFixed(1)}x`;
+      case 'founded':      return String(val);
+      case 'employees':    return val.toLocaleString();
+      case 'g2_rating':    return val.toFixed(1);
+      default:             return String(val);
+    }
+  }
+
+  // Normalise filter field (LLM may use underscores instead of spaces)
+  let rows = data;
+  if (filter) {
+    const col = filter.field.replace(/_/g, ' ');
+    const q   = filter.contains.toLowerCase();
+    rows = data.filter(r => (r[col] || '').toLowerCase().includes(q));
+  }
+
+  rows = rows.filter(r => getValue(r, sort_by) != null);
+  rows.sort((a, b) => {
+    const va = getValue(a, sort_by), vb = getValue(b, sort_by);
+    return order === 'asc' ? va - vb : vb - va;
+  });
+  rows = rows.slice(0, limit);
+
+  if (!rows.length) return 'No matching companies found.';
+
+  return rows
+    .map((r, i) => `${i + 1}. ${r['Company Name']} — ${fmtValue(sort_by, getValue(r, sort_by))}`)
+    .join('<br>');
+}
+
 // ── Chat rendering ────────────────────────────────────────────────────────────
 
 function appendTyping() {
@@ -173,6 +230,12 @@ async function sendMessage(prompt) {
         appendMessage('assistant', "Sorry, I couldn't understand that lookup request.");
       } else {
         withData(rows => appendMessage('assistant', resolveLookup(data.company, data.field, rows)));
+      }
+    } else if (data.chart === 'query') {
+      if (!data.sort_by) {
+        appendMessage('assistant', "Sorry, I couldn't understand that query.");
+      } else {
+        withData(rows => appendMessage('assistant', resolveQuery(data, rows)));
       }
     } else if (data.chart === 'none' || !CHARTS[data.chart]) {
       appendMessage('assistant', data.title);

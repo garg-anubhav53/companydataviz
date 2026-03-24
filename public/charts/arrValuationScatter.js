@@ -173,8 +173,9 @@ function initArrValuationScatter(canvasId, data) {
             label(ctx) {
               if (ctx.dataset.label === 'Best Fit') {
                 return [
-                  `$1B ARR → ~${fmtB(ref1B)} valuation (~${Math.round(ref1B)}x)`,
-                  `$10B ARR → ~${fmtB(ref10B)} valuation (~${Math.round(ref10B / 10)}x)`,
+                  `$1B ARR → ~${fmtB(ref1B)} (~${Math.round(ref1B)}x avg revenue multiple)`,
+                  `$10B ARR → ~${fmtB(ref10B)} (~${Math.round(ref10B / 10)}x avg revenue multiple)`,
+                  'Multiples compress at scale — markets price growth, not just revenue.',
                 ];
               }
               const { label, x, y } = ctx.raw;
