@@ -73,6 +73,39 @@ async function checkKeyStatus() {
   }
 }
 
+// ── Company lookup ────────────────────────────────────────────────────────────
+
+function resolveLookup(company, field, data) {
+  const q = company.toLowerCase();
+  const row = data.find(r => r['Company Name'].toLowerCase() === q)
+           || data.find(r => r['Company Name'].toLowerCase().includes(q));
+
+  if (!row) return `No company matching "${company}" found in the dataset.`;
+
+  const name = row['Company Name'];
+
+  function fmtB(b) {
+    if (b == null) return null;
+    if (b < 1)    return `$${(b * 1000).toFixed(0)}M`;
+    if (b < 1000) return `$${b}B`;
+    return `$${(b / 1000).toFixed(1)}T`;
+  }
+
+  switch (field) {
+    case 'valuation': return fmtB(row.valuation_b)   ? `${name} valuation: ${fmtB(row.valuation_b)}`        : `${name}: valuation not available.`;
+    case 'arr':       return fmtB(row.arr_b)          ? `${name} ARR: ${fmtB(row.arr_b)}`                    : `${name}: ARR not available.`;
+    case 'investors': return `${name} top investors: ${row['Top Investors']  || 'not available'}`;
+    case 'industry':  return `${name} industry: ${row['Industry']            || 'not available'}`;
+    case 'hq':        return `${name} headquarters: ${row['HQ']              || 'not available'}`;
+    case 'employees': return `${name} employees: ${row['Employees']          || 'not available'}`;
+    case 'funding':   return `${name} total funding: ${row['Total Funding']  || 'not available'}`;
+    case 'founded':   return `${name} founded: ${row.founded_year            || 'not available'}`;
+    case 'product':   return `${name} product: ${row['Product']              || 'not available'}`;
+    case 'g2_rating': return `${name} G2 rating: ${row['G2 Rating']         || 'not available'}`;
+    default:          return `Unknown field "${field}".`;
+  }
+}
+
 // ── Chat rendering ────────────────────────────────────────────────────────────
 
 function appendMessage(role, text) {
@@ -122,6 +155,12 @@ async function sendMessage(prompt) {
 
     if (data.error) {
       appendMessage('assistant', `Error: ${data.error}`);
+    } else if (data.chart === 'lookup') {
+      if (!data.company || !data.field) {
+        appendMessage('assistant', "Sorry, I couldn't understand that lookup request.");
+      } else {
+        withData(rows => appendMessage('assistant', resolveLookup(data.company, data.field, rows)));
+      }
     } else if (data.chart === 'none' || !CHARTS[data.chart]) {
       appendMessage('assistant', data.title);
     } else {

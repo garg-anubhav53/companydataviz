@@ -15,9 +15,12 @@ The available chart_ids are:
 - "scatter" — founded year vs valuation (scatter plot, log scale Y axis)
 - "investors" — most frequent investors (horizontal bar chart of investor frequency)
 - "arr-scatter" — ARR vs valuation (scatter plot, both axes log scale)
+- "lookup" — a specific fact about one company; use this shape instead:
+  {"chart": "lookup", "company": "<name from the user's question>", "field": "<field>"}
+  Valid fields: valuation, arr, investors, industry, hq, employees, funding, founded, product, g2_rating
 
-Pick the chart_id that best matches the user's request. If the request doesn't match any chart, respond with:
-{"chart": "none", "title": "I can show you: industry breakdown, founded year vs valuation, ARR vs valuation, or top investors."}`;
+Pick the chart_id that best matches the user's request. If the request doesn't match any chart or lookup, respond with:
+{"chart": "none", "title": "I can show you: industry breakdown, founded year vs valuation, ARR vs valuation, top investors, or look up a fact about a specific company."}`;
 
 app.get('/api/key-status', (req, res) => {
   res.json({ hasKey: !!process.env.ANTHROPIC_API_KEY });

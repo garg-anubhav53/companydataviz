@@ -10,17 +10,20 @@
 ## Mental model
 
 User types prompt → Express (`server.js`) sends it to Claude with `SYSTEM_PROMPT`
-→ Claude returns `{ "chart": "<id>", "title": "..." }` → `main.js` creates a
+→ Claude returns `{ "chart": "<id>", "title": "..." }` (or lookup JSON) → `main.js` creates a
 fresh `<canvas>`, looks up the chart in `CHARTS`, calls the matching init
-function with the already-loaded CSV rows.
+function with the already-loaded CSV rows. For lookup requests, calls `resolveLookup()`.
 
 **The CSV is loaded once.** `data.js::loadData` fetches `companies.csv`,
 normalises every row, adds three computed fields. `main.js::withData` memoizes
-the result in module-level `appData`; the callback fires synchronously on
-subsequent calls. It is safe to call `withData` multiple times.
+the result; the callback fires synchronously on subsequent calls. It is safe to call `withData` multiple times.
 
 **Chart.js binds permanently to a canvas.** Never reuse a canvas element.
 `main.js` auto-increments a counter (`chart-1`, `chart-2`, …).
+
+**Lookup requests return text, not charts.** When `chart: "lookup"`, the system
+calls `resolveLookup(company, field, data)` and returns a formatted string
+instead of creating a canvas.
 
 ---
 
@@ -30,10 +33,11 @@ subsequent calls. It is safe to call `withData` multiple times.
 |---|---|---|
 | `server.js` | Express routes, API key priority, `SYSTEM_PROMPT` | Editing a route or the routing prompt |
 | `public/data.js` | `parseCurrency(str)`, `loadData(cb)` | Editing currency parsing or CSV loading |
-| `public/main.js` | `withData()`, API key UI, chat submit, `appendChart()`, `CHARTS` map | Editing chat flow or registering a new chart |
+| `public/main.js` | `withData()`, API key UI, chat submit, `appendChart()`, `CHARTS` map, `resolveLookup()` | Editing chat flow, lookup logic, or registering a new chart |
 | `public/charts/*.js` | One file per chart, `initXxx(canvasId, data)` | Only the specific file being changed |
 | `public/index.html` | Static shell, `<script>` tags | Adding a new chart file reference |
 | `public/companies.csv` | Source data | **Never open — all column info is in this file** |
+| `public/data-verification.js` | Data validation tools | Running verification checks |
 
 ---
 
@@ -107,6 +111,7 @@ have this shape:
 The available chart_ids are:
 - "<id>" — <description>
 - ...
+- "lookup" — Return company-specific data: {"chart": "lookup", "company": "<name>", "field": "<field>"}
 
 Pick the chart_id that best matches the user's request. If the request
 doesn't match any chart, respond with:
@@ -116,6 +121,10 @@ doesn't match any chart, respond with:
 **When adding a chart:** add exactly one bullet to the `chart_ids` list and
 update the `"none"` fallback sentence to mention the new chart. Touch nothing
 else in the prompt. Keep `max_tokens: 100`.
+
+**Lookup requests:** Use `{"chart": "lookup", "company": "<name>", "field": "<field>"}`.
+No `title` field. Valid fields: `valuation`, `arr`, `investors`, `industry`, `hq`, 
+`employees`, `funding`, `founded`, `product`, `g2_rating`.
 
 ---
 
@@ -127,6 +136,12 @@ else in the prompt. Keep `max_tokens: 100`.
 | `scatter` | `foundedValuationScatter.js` | Scatter (log Y) | `founded_year` × `valuation_b` |
 | `investors` | `investorBar.js` | Horizontal bar | `Top Investors` → top 15 by count |
 | `arr-scatter` | `arrValuationScatter.js` | Scatter (log/log) | `arr_b` × `valuation_b` |
+| `lookup` | *(no chart file)* | Text reply | Any column; `resolveLookup()` in `main.js` |
+
+**lookup JSON shape** (differs from chart shape — no `title` field):
+`{"chart": "lookup", "company": "<name>", "field": "<field>"}`
+Valid fields: `valuation`, `arr`, `investors`, `industry`, `hq`, `employees`, `funding`, `founded`, `product`, `g2_rating`
+Company match: exact case-insensitive → substring fallback.
 
 **Untapped columns available for future charts:**
 `HQ`, `Employees`, `Total Funding` (parseable via `parseCurrency`),
@@ -135,6 +150,27 @@ else in the prompt. Keep `max_tokens: 100`.
 ---
 
 ## Task recipes
+
+### Add a new lookup field
+
+Edit `resolveLookup()` in `public/main.js`:
+1. Add the new field to the `switch` statement
+2. Use `fmtB()` helper for currency fields, direct string for others
+3. Handle null/undefined cases with fallback text
+
+Example:
+```js
+case 'new_field': return `${name} new field: ${row['Column Name'] || 'not available'}`;
+```
+
+### Modify lookup behavior
+
+Edit only `resolveLookup()` in `public/main.js`. The function handles:
+- Company matching (exact → substring fallback)
+- Field formatting (currency via `fmtB()`, text via direct access)
+- Error cases (no company found, unknown field)
+
+---
 
 ### Add a new chart (5 steps, touch only these things)
 
@@ -203,6 +239,8 @@ out before the chart receives them.
 | LLM call server-side only | Anthropic API rejects browser-origin requests (CORS) |
 | Never read `companies.csv` | All column info is in this file |
 | Do not create a shared color module | Adds a dependency with no current benefit; copy the constants from this file instead |
+| Lookup requests bypass canvas creation | `resolveLookup()` returns formatted text, not Chart.js instances |
+| Company matching uses exact → substring fallback | Provides flexibility while maintaining accuracy |
 
 ---
 
