@@ -87,28 +87,28 @@ function initFoundedValuationScatter(canvasId) {
     { x: 2016, y: 3.2,    label: "Verkada" },
     { x: 2016, y: 5.3,    label: "OneTrust" },
     { x: 2017, y: 12.3,   label: "Brex" },
-    { x: 2019, y: 8.1,    label: "Ramp" }
+    { x: 2019, y: 8.1,    label: "Ramp" },
   ];
 
-  // Drop any points that would break a log scale (y must be > 0)
-  const DATA = RAW_DATA
-    .filter(d => d.y != null && isFinite(d.y) && d.y > 0)
-    .map(d => ({
-      // Add a small deterministic x-jitter per company to separate dots stacked
-      // on the same founding year. Jitter is ±0.35 based on label character sum
-      // so it stays stable across renders (not random each load).
-      x: d.x + (charSum(d.label) % 7 - 3) * 0.1,
-      y: d.y,
-      label: d.label,
-      year: d.x   // preserve original year for tooltip
-    }));
-
-  // Simple deterministic jitter: sum of char codes mod N
+  // Sums char codes of a string — used for deterministic jitter.
   function charSum(str) {
     return str.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
   }
 
-  // Log-scale tick values we want labeled
+  // Drop points with invalid valuations (log scale breaks at y <= 0).
+  // Apply a small deterministic x-offset so companies sharing a founding year
+  // don't stack exactly on top of each other. Offset is based on the company
+  // name so it's stable across renders (unlike Math.random()).
+  const DATA = RAW_DATA
+    .filter(d => d.y != null && isFinite(d.y) && d.y > 0)
+    .map(d => ({
+      x: d.x + (charSum(d.label) % 7 - 3) * 0.1,
+      y: d.y,
+      label: d.label,
+      year: d.x, // original year, shown in tooltip
+    }));
+
+  // Tick values to label on the log Y-axis.
   const LOG_TICKS = [1, 10, 100, 1000, 10000];
 
   return new Chart(document.getElementById(canvasId), {
@@ -121,8 +121,8 @@ function initFoundedValuationScatter(canvasId) {
         borderColor: 'rgba(54, 162, 235, 0.9)',
         borderWidth: 1,
         pointRadius: 6,
-        pointHoverRadius: 9
-      }]
+        pointHoverRadius: 9,
+      }],
     },
     options: {
       responsive: true,
@@ -132,34 +132,30 @@ function initFoundedValuationScatter(canvasId) {
           display: true,
           text: 'Founded Year vs. Valuation — Top 100 SaaS Companies',
           font: { size: 15, weight: 'bold' },
-          padding: { bottom: 16 }
+          padding: { bottom: 16 },
         },
-        legend: { display: false },  // redundant with the title
+        legend: { display: false },
         tooltip: {
           callbacks: {
-            label: function(ctx) {
-              const pt = ctx.raw;
-              const valuation = pt.y >= 1000
-                ? `$${(pt.y / 1000).toFixed(1)}T`
-                : `$${pt.y}B`;
-              return `${pt.label} — ${valuation} (founded ${pt.year})`;
-            }
-          }
-        }
+            label(ctx) {
+              const { label, y, year } = ctx.raw;
+              const valuation = y >= 1000 ? `$${(y / 1000).toFixed(1)}T` : `$${y}B`;
+              return `${label} — ${valuation} (founded ${year})`;
+            },
+          },
+        },
       },
       scales: {
         x: {
-          title: { display: true, text: 'Founded Year' },
           min: 1969,
           max: 2021,
+          title: { display: true, text: 'Founded Year' },
           ticks: {
             stepSize: 5,
-            // Only label clean 5-year multiples; skip jitter-fractional ticks
-            callback: function(value) {
-              return Number.isInteger(value) && value % 5 === 0 ? value : '';
-            }
+            // Suppress fractional-year ticks produced by the jitter offset.
+            callback: value => (Number.isInteger(value) && value % 5 === 0 ? value : ''),
           },
-          grid: { color: 'rgba(0,0,0,0.06)' }
+          grid: { color: 'rgba(0,0,0,0.06)' },
         },
         y: {
           type: 'logarithmic',
@@ -167,17 +163,17 @@ function initFoundedValuationScatter(canvasId) {
           max: 10000,
           title: { display: true, text: 'Valuation (USD Billions, log scale)' },
           ticks: {
-            callback: function(value) {
-              // Floating-point safe: check if value rounds to a labeled tick
+            // Chart.js emits log-scale ticks as floats — use a tolerance check
+            // instead of strict equality to avoid missing labels like 1.0000001.
+            callback(value) {
               const match = LOG_TICKS.find(t => Math.abs(value - t) / t < 0.01);
               if (!match) return '';
-              if (match >= 1000) return '$' + (match / 1000) + 'T';
-              return '$' + match + 'B';
-            }
+              return match >= 1000 ? `$${match / 1000}T` : `$${match}B`;
+            },
           },
-          grid: { color: 'rgba(0,0,0,0.06)' }
-        }
-      }
-    }
+          grid: { color: 'rgba(0,0,0,0.06)' },
+        },
+      },
+    },
   });
 }

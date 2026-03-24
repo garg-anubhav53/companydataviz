@@ -2,7 +2,7 @@ function initInvestorBar(canvasId) {
   const LABELS = [
     "Sequoia", "Accel", "Bessemer", "Andreessen Horowitz", "NEA",
     "Benchmark", "ICONIQ", "Greylock", "IVP", "Lightspeed",
-    "Kleiner Perkins", "Founders Fund", "Tiger Global", "Insight", "General Catalyst"
+    "Kleiner Perkins", "Founders Fund", "Tiger Global", "Insight", "General Catalyst",
   ];
 
   const COUNTS = [18, 13, 11, 10, 8, 7, 6, 6, 6, 6, 5, 5, 5, 4, 3];
@@ -22,8 +22,24 @@ function initInvestorBar(canvasId) {
     "Palantir, Asana, Rippling, Affirm, Ramp",
     "Toast, Redis, Snyk, ServiceTitan, Procore",
     "Monday.com, Qualtrics, OneTrust, Automattic",
-    "HubSpot, Grammarly, Gusto"
+    "HubSpot, Grammarly, Gusto",
   ];
+
+  // Wraps a comma-separated company string into lines of at most `maxLen` chars.
+  function wrapCompanies(str, maxLen) {
+    const words = str.split(', ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      if (line.length > 0 && (line + word).length > maxLen) {
+        lines.push(line.replace(/,\s*$/, ''));
+        line = '';
+      }
+      line += word + ', ';
+    }
+    if (line.length > 0) lines.push(line.replace(/,\s*$/, ''));
+    return lines;
+  }
 
   return new Chart(document.getElementById(canvasId), {
     type: 'bar',
@@ -34,8 +50,8 @@ function initInvestorBar(canvasId) {
         data: COUNTS,
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
         borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1
-      }]
+        borderWidth: 1,
+      }],
     },
     options: {
       indexAxis: 'y',
@@ -45,41 +61,29 @@ function initInvestorBar(canvasId) {
           display: true,
           text: 'Most Frequent Investors Across Top 100 SaaS Companies',
           font: { size: 15, weight: 'bold' },
-          padding: { bottom: 16 }
+          padding: { bottom: 16 },
         },
         legend: { display: false },
         tooltip: {
           callbacks: {
-            afterBody: function(tooltipItems) {
+            afterBody(tooltipItems) {
               const idx = tooltipItems[0].dataIndex;
-              // Wrap company list at ~60 chars so tooltip doesn't run off screen
-              const words = COMPANIES[idx].split(', ');
-              const lines = [];
-              let line = '';
-              for (const word of words) {
-                if ((line + word).length > 60) {
-                  lines.push(line.trim());
-                  line = '';
-                }
-                line += word + ', ';
-              }
-              if (line.trim()) lines.push(line.replace(/,\s*$/, ''));
-              return ['\nPortfolio:', ...lines];
-            }
-          }
-        }
+              return ['\nPortfolio:', ...wrapCompanies(COMPANIES[idx], 60)];
+            },
+          },
+        },
       },
       scales: {
         x: {
-          title: { display: true, text: 'Number of Companies' },
           beginAtZero: true,
+          title: { display: true, text: 'Number of Companies' },
           ticks: { stepSize: 2 },
-          grid: { color: 'rgba(0,0,0,0.06)' }
+          grid: { color: 'rgba(0,0,0,0.06)' },
         },
         y: {
-          grid: { display: false }
-        }
-      }
-    }
+          grid: { display: false },
+        },
+      },
+    },
   });
 }
