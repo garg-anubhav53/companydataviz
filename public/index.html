@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SaaS Company Data Viz</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #f5f5f5;
+      font-family: sans-serif;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    header h1 {
+      font-size: 1rem;
+      color: #333;
+    }
+
+    #key-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    #key-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    #key-dot.connected { background: #4caf50; }
+
+    #key-input {
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 260px;
+    }
+
+    /* ── Chat messages ── */
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .msg {
+      max-width: 720px;
+      width: 100%;
+    }
+
+    .msg.user { align-self: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+
+    .msg-bubble {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .msg.user .msg-bubble {
+      background: #4e79a7;
+      color: white;
+    }
+
+    .msg.assistant .msg-bubble {
+      background: white;
+      color: #333;
+      border: 1px solid #e0e0e0;
+    }
+
+    .msg-caption {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+
+    .chart-wrapper {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px;
+      width: 100%;
+      max-width: 720px;
+    }
+
+    /* ── Input bar ── */
+    #chat-form {
+      display: flex;
+      gap: 8px;
+      padding: 12px 20px;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    #chat-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    #chat-input:focus { border-color: #4e79a7; }
+
+    #send-btn {
+      padding: 10px 20px;
+      background: #4e79a7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    #send-btn:disabled { background: #aaa; cursor: default; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Top 100 SaaS Companies</h1>
+    <div id="key-status">
+      <div id="key-dot"></div>
+      <span id="key-label">Checking API key…</span>
+      <input id="key-input" type="password" placeholder="Paste Anthropic API key" style="display:none" />
+    </div>
+  </header>
+
+  <div id="chat-messages"></div>
+
+  <form id="chat-form">
+    <input id="chat-input" type="text" placeholder="Ask about the data — e.g. 'show me the industry breakdown'" autocomplete="off" />
+    <button id="send-btn" type="submit">Send</button>
+  </form>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="charts/industryPie.js"></script>
+  <script src="charts/foundedValuationScatter.js"></script>
+  <script src="charts/investorBar.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

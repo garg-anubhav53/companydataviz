@@ -6,23 +6,21 @@ How this project is structured and how each piece works. Updated after every mea
 
 ## What This Is
 
-A pure-frontend data visualization tool. No server, no build step, no framework — every file opens directly in a browser by double-clicking.
+A chat-driven data visualization tool. Type a natural-language prompt, get a chart back. A Node/Express server proxies prompts to Claude, which returns a chart ID. The frontend renders the matching hardcoded chart in the chat thread.
 
-**Stack:** HTML + vanilla JavaScript + Chart.js 4.4.7 (loaded from CDN)
+**Stack:** Node.js + Express · Anthropic API (Claude) · Chart.js 4.4.7 (CDN) · Vanilla JS frontend
 
 ---
 
-## Current State: Iteration 3
+## Current State: Iteration 4
 
-Three charts, all hardcoded data:
+Three hardcoded charts, routed by LLM:
 
-| Chart | File | Description |
-|---|---|---|
-| Pie | `charts/industryPie.js` | Industry breakdown of top 100 SaaS companies |
-| Scatter | `charts/foundedValuationScatter.js` | Founded year vs. valuation (log scale) |
-| Bar | `charts/investorBar.js` | Most frequent investors by portfolio count |
-
-The pie and scatter charts are accessible via tabs in `index.html`. The bar chart is standalone in `investors.html`.
+| chart_id    | Chart type        | Description                                  |
+|-------------|-------------------|----------------------------------------------|
+| `pie`       | Pie               | Industry breakdown of top 100 SaaS companies |
+| `scatter`   | Scatter (log)     | Founded year vs. valuation                   |
+| `investors` | Horizontal bar    | Most frequent investors by portfolio count   |
 
 ---
 
@@ -30,88 +28,83 @@ The pie and scatter charts are accessible via tabs in `index.html`. The bar char
 
 ```
 companydataviz/
-├── index.html                           # Tabbed UI — pie and scatter charts
-├── scatter.html                         # Standalone scatter (isolated testing)
-├── investors.html                       # Standalone investor bar chart
-├── main.js                              # Tab switching + lazy chart initialization
-├── charts/
-│   ├── industryPie.js                   # Pie chart
-│   ├── foundedValuationScatter.js       # Scatter chart
-│   └── investorBar.js                   # Horizontal bar chart
-├── iterative_specs/                     # Per-iteration build specs
-├── test_outputs/                        # Screenshots for visual QA
-├── CODEBASE.md                          # This file
-└── README.md                            # Project overview
+├── server.js                        # Express server + /api/chat route
+├── .env                             # ANTHROPIC_API_KEY (gitignored)
+├── .env.example                     # Template for .env
+├── package.json                     # npm config, "start": "node server.js"
+├── public/                          # Static files served by Express
+│   ├── index.html                   # Chat UI
+│   ├── main.js                      # Chat logic, API calls, chart rendering
+│   ├── charts/
+│   │   ├── industryPie.js           # initIndustryPie(canvasId)
+│   │   ├── foundedValuationScatter.js # initFoundedValuationScatter(canvasId)
+│   │   └── investorBar.js           # initInvestorBar(canvasId)
+│   ├── scatter.html                 # Standalone scatter (dev/testing)
+│   └── investors.html               # Standalone investor bar (dev/testing)
+├── iterative_specs/                 # Per-iteration build specs
+├── test_outputs/                    # Screenshots for visual QA
+├── data_verification.md             # SQL + expected output for each chart
+├── CODEBASE.md                      # This file
+└── README.md                        # Project overview
 ```
 
 ---
 
 ## How It Works
 
-### `index.html`
+### Running the app
 
-The main entry point. Contains:
-- Page layout and tab styling
-- Two `.tab-panel` divs (one per chart), each with a `<canvas>`
-- Script tags loading Chart.js then the chart files then `main.js`
-
-Script load order matters — Chart.js must come first (defines the global `Chart`), chart files second (define the `init` functions), `main.js` last (calls those functions):
-
-```
-chart.js (CDN) → industryPie.js → foundedValuationScatter.js → main.js
+```bash
+cp .env.example .env      # add your key
+npm install
+npm start                 # http://localhost:3000
 ```
 
-### `main.js`
+### `server.js`
 
-Owns all tab logic. The `CHART_INIT` map connects each tab name to its initializer:
+Two routes:
 
+- **`GET /api/key-status`** — returns `{ hasKey: true/false }` so the frontend knows whether to show the key input field.
+- **`POST /api/chat`** — takes `{ message }`, calls the Anthropic Messages API with a routing system prompt, returns `{ chart, title }`.
+
+API key priority: `req.headers['x-api-key']` (user-pasted in UI) falls back to `process.env.ANTHROPIC_API_KEY` (`.env` file).
+
+The system prompt instructs Claude to respond with only a JSON object: `{ "chart": "<chart_id>", "title": "<description>" }`. `max_tokens: 100` keeps the call cheap — the response is never more than one small JSON object.
+
+Claude's raw response is in `data.content[0].text`. This is JSON-parsed and forwarded to the frontend. If parsing fails, a graceful error message is returned.
+
+### `public/index.html`
+
+Pure layout — chat header, scrollable message feed, fixed input bar. No logic. Loads Chart.js from CDN, then the three chart files, then `main.js`.
+
+### `public/main.js`
+
+Three responsibilities:
+
+**1. API key check** (`checkKeyStatus`)
+On load, hits `/api/key-status`. If no key is configured, shows a password input in the header. The user-pasted key is stored in `userApiKey` and sent as `x-api-key` on subsequent requests.
+
+**2. Message rendering** (`appendMessage`, `appendChart`)
+User messages appear as right-aligned blue bubbles. Assistant text responses appear as left-aligned white bubbles. Chart responses get a caption line (the `title` from Claude) above a fresh `<canvas>` in a white card.
+
+Each chart gets a unique canvas ID (`chart-1`, `chart-2`, …) via `canvasCounter`. This is required because Chart.js binds permanently to a canvas element — reusing the same canvas causes ghost rendering artifacts.
+
+**3. Send flow** (`sendMessage`)
+POST to `/api/chat` → parse `{ chart, title }` → if `chart === 'none'` or unknown, show title as text → otherwise call `CHARTS[chartId].init(canvasId)`.
+
+The `CHARTS` map connects each `chart_id` to its init function:
 ```javascript
-const CHART_INIT = {
-  pie:     () => initIndustryPie('pie-canvas'),
-  scatter: () => initFoundedValuationScatter('scatter-canvas'),
+const CHARTS = {
+  pie:       { init: (id) => initIndustryPie(id) },
+  scatter:   { init: (id) => initFoundedValuationScatter(id) },
+  investors: { init: (id) => initInvestorBar(id) },
 };
 ```
+Adding a new chart = new entry here + new chart file in `public/charts/`.
 
-Adding a new tab = one new entry in `CHART_INIT` plus the corresponding HTML panel.
+### `public/charts/*.js`
 
-`showTab(tabName)` toggles the active button, shows/hides panels, and lazily initializes the chart on first visit. Lazy init matters because Chart.js needs a visible, sized canvas to compute dimensions correctly — initializing into a hidden canvas produces a broken layout.
-
-Chart instances are stored in `chartInstances` so each chart is only created once.
-
-### `scatter.html` / `investors.html`
-
-Standalone pages for isolated testing — useful for verifying a chart without the tab layer in the way. Each loads only the script it needs and calls the init function directly.
-
----
-
-## Chart Files
-
-Each chart file exports one function: `initXxx(canvasId)`. It defines the data, builds the Chart.js config, and returns the Chart instance.
-
-### `charts/industryPie.js` — `initIndustryPie(canvasId)`
-
-Straightforward pie chart. Labels, values, and colors are defined in a single `industryData` object for easy scanning.
-
-### `charts/foundedValuationScatter.js` — `initFoundedValuationScatter(canvasId)`
-
-The most complex chart. Data goes through a pipeline before reaching Chart.js:
-
-1. **Filter** — drops any point where `y` is null, non-finite, or `≤ 0`. The log scale is undefined at zero and would crash silently.
-2. **Jitter** — many companies share the same founding year (12 were founded in 2011). Without adjustment, their dots stack directly on top of each other. `charSum()` sums the char codes of the company name to produce a small, stable x-offset (±0.3 years). Using char codes instead of `Math.random()` means the positions are identical on every page load.
-3. **Preserve original year** — the jittered `x` drives dot position; the original `year` is kept separately for tooltips.
-
-Y-axis details:
-- `type: 'logarithmic'` with explicit `min: 1, max: 10000` — without `min: 1`, Chart.js auto-selects a floor below 1, producing a broken tick label
-- Tick callback uses a **relative tolerance check** (`Math.abs(value - t) / t < 0.01`) instead of `===` because Chart.js emits log-scale tick values as floats that rarely equal round numbers exactly
-- Only four ticks are labeled: `$1B`, `$10B`, `$100B`, `$1T`
-
-X-axis: `min: 1969, max: 2021` gives margin so SAP (1972) and Ramp (2019) aren't flush against the edges. Tick callback suppresses fractional-year values introduced by jitter.
-
-### `charts/investorBar.js` — `initInvestorBar(canvasId)`
-
-Horizontal bar chart using `indexAxis: 'y'` (the Chart.js v4 approach — `type: 'horizontalBar'` was removed in v4).
-
-`wrapCompanies(str, maxLen)` breaks the long portfolio company strings into lines of at most 60 characters for the tooltip, so the tooltip doesn't overflow the viewport on investors with large portfolios like Sequoia (18 companies).
+Unchanged from iteration 3. Each file exposes one `initXxx(canvasId)` function that builds a Chart.js config and returns the instance. See earlier sections of this doc for per-chart details.
 
 ---
 
@@ -119,18 +112,17 @@ Horizontal bar chart using `indexAxis: 'y'` (the Chart.js v4 approach — `type:
 
 | Decision | Reason |
 |---|---|
-| `init` functions, not immediate execution | `main.js` controls when charts run; prevents rendering into hidden canvases |
-| Lazy init on first tab click | Chart.js needs a visible canvas to compute dimensions |
-| `CHART_INIT` map in `main.js` | Adding a new chart tab is one line, not a new `if` block |
-| `charSum` jitter instead of `Math.random()` | Positions are stable across page reloads |
-| Relative tolerance for log tick matching | Float precision makes strict `===` unreliable on log scales |
-| Explicit `min`/`max` on log Y-axis | Prevents Chart.js from auto-choosing a sub-1 floor |
-| CDN for Chart.js | No build step needed |
+| LLM call goes through the server, never the browser | Anthropic API blocks browser requests via CORS |
+| `max_tokens: 100` | Response is always a tiny JSON object — no need to pay for more |
+| Fresh canvas per chat response | Chart.js binds to a canvas permanently; reusing causes ghost artifacts |
+| `canvasCounter` for unique IDs | Simple, zero-dependency way to guarantee unique canvas IDs per session |
+| `x-api-key` header fallback | Lets evaluators paste their own key without touching `.env` |
+| `.env.example` committed, `.env` gitignored | Documents required config without exposing secrets |
 
 ---
 
 ## What Comes Next
 
-1. Load real data from CSV using PapaParse (replaces hardcoded arrays)
+1. Load real data from CSV using PapaParse (replace hardcoded arrays)
 2. Build a `renderChart(canvasId, config)` generic renderer driven by a JSON spec
-3. Wire in an LLM to interpret natural-language prompts and produce those specs
+3. Have Claude generate full chart specs (data + config) rather than just routing to hardcoded charts

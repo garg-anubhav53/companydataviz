@@ -1,0 +1,25 @@
+{
+  "name": "companydataviz",
+  "version": "1.0.0",
+  "description": "A JavaScript data visualization project.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garg-anubhav53/companydataviz.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/garg-anubhav53/companydataviz/issues"
+  },
+  "homepage": "https://github.com/garg-anubhav53/companydataviz#readme",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  }
+}

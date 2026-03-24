@@ -1,24 +1,24 @@
 # Dependencies
 node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*key*
+*secret*
+*credential*
+key_stored_later.md
+
+# Internal/dev-only docs
+data_verification.md
+
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Build output
-dist/
-build/
-out/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Logs
 logs/
-*.log
 
 # OS files
 .DS_Store
@@ -30,5 +30,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# Coverage
+# Build output
+dist/
+build/
+out/
 coverage/
