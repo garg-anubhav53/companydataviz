@@ -1,31 +1,24 @@
-function initInvestorBar(canvasId) {
-  const LABELS = [
-    "Sequoia", "Accel", "Bessemer", "Andreessen Horowitz", "NEA",
-    "Benchmark", "ICONIQ", "Greylock", "IVP", "Lightspeed",
-    "Kleiner Perkins", "Founders Fund", "Tiger Global", "Insight", "General Catalyst",
-  ];
+function initInvestorBar(canvasId, data) {
+  // Count how many companies each investor appears in; track company names for tooltips
+  const counts = {};
+  const portfolios = {};
 
-  const COUNTS = [18, 13, 11, 10, 8, 7, 6, 6, 6, 6, 5, 5, 5, 4, 3];
+  data.forEach(row => {
+    const name = row['Company Name'];
+    const investors = (row['Top Investors'] || '').split(',').map(s => s.trim()).filter(Boolean);
+    investors.forEach(inv => {
+      counts[inv] = (counts[inv] || 0) + 1;
+      portfolios[inv] = portfolios[inv] ? portfolios[inv] + ', ' + name : name;
+    });
+  });
 
-  const COMPANIES = [
-    "Snowflake, Notion, MongoDB, Stripe, Square, Canva, Dropbox, UiPath, Confluent, Amplitude, Mixpanel, Palo Alto Networks, RingCentral, Qualtrics, Gong, Verkada, Netskope, ServiceTitan",
-    "DocuSign, Slack, Dropbox, Freshworks, Klaviyo, UiPath, Miro, Segment, Sumo Logic, CrowdStrike, Qualtrics, Algolia, Snyk",
-    "Shopify, Twilio, Canva, Box, PagerDuty, SendGrid, Intercom, Auth0, Wix, LaunchDarkly, Procore",
-    "Slack, Okta, Stripe, Databricks, PagerDuty, Mixpanel, Carta, Navan, Samsara, Tanium",
-    "Workday, MongoDB, Box, Databricks, Elastic, Cloudflare, Braze, Plaid",
-    "Asana, Airtable, Zendesk, Confluent, Elastic, New Relic, Wix",
-    "Snowflake, Datadog, GitLab, Miro, Calendly, Marqeta",
-    "Okta, Figma, Sumo Logic, Palo Alto Networks, Rubrik, AppDynamics",
-    "UiPath, HashiCorp, Grammarly, Amplitude, Tanium, CircleCI",
-    "Zscaler, Carta, Affirm, Netskope, Rubrik, AppDynamics",
-    "Intuit, DocuSign, Intercom, Segment, Looker",
-    "Palantir, Asana, Rippling, Affirm, Ramp",
-    "Toast, Redis, Snyk, ServiceTitan, Procore",
-    "Monday.com, Qualtrics, OneTrust, Automattic",
-    "HubSpot, Grammarly, Gusto",
-  ];
+  const top15 = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15);
 
-  // Wraps a comma-separated company string into lines of at most `maxLen` chars.
+  const labels = top15.map(([inv]) => inv);
+  const values = top15.map(([, count]) => count);
+
   function wrapCompanies(str, maxLen) {
     const words = str.split(', ');
     const lines = [];
@@ -44,10 +37,10 @@ function initInvestorBar(canvasId) {
   return new Chart(document.getElementById(canvasId), {
     type: 'bar',
     data: {
-      labels: LABELS,
+      labels,
       datasets: [{
         label: 'Portfolio Companies',
-        data: COUNTS,
+        data: values,
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1,
@@ -67,8 +60,8 @@ function initInvestorBar(canvasId) {
         tooltip: {
           callbacks: {
             afterBody(tooltipItems) {
-              const idx = tooltipItems[0].dataIndex;
-              return ['\nPortfolio:', ...wrapCompanies(COMPANIES[idx], 60)];
+              const inv = labels[tooltipItems[0].dataIndex];
+              return ['\nPortfolio:', ...wrapCompanies(portfolios[inv], 60)];
             },
           },
         },
@@ -80,9 +73,7 @@ function initInvestorBar(canvasId) {
           ticks: { stepSize: 2 },
           grid: { color: 'rgba(0,0,0,0.06)' },
         },
-        y: {
-          grid: { display: false },
-        },
+        y: { grid: { display: false } },
       },
     },
   });

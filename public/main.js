@@ -1,12 +1,22 @@
-// Maps chart_id returned by the LLM to the matching init function and canvas label.
+// Maps chart_id to its initializer. Each init receives (canvasId, data).
+// To add a new chart: one entry here + the HTML panel + a script tag.
 const CHARTS = {
-  pie:       { init: (id) => initIndustryPie(id) },
-  scatter:   { init: (id) => initFoundedValuationScatter(id) },
-  investors: { init: (id) => initInvestorBar(id) },
+  pie:           { init: (id, data) => initIndustryPie(id, data) },
+  scatter:       { init: (id, data) => initFoundedValuationScatter(id, data) },
+  investors:     { init: (id, data) => initInvestorBar(id, data) },
+  'arr-scatter': { init: (id, data) => initArrValuationScatter(id, data) },
 };
 
-let userApiKey = null;   // set if user pastes a key manually
-let canvasCounter = 0;   // ensures each canvas has a unique id
+let appData = null;       // populated once by loadData()
+let userApiKey = null;
+let canvasCounter = 0;
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+
+function withData(callback) {
+  if (appData) return callback(appData);
+  loadData(rows => { appData = rows; callback(appData); });
+}
 
 // ── API key status ────────────────────────────────────────────────────────────
 
@@ -44,7 +54,6 @@ async function checkKeyStatus() {
   const { hasKey } = await fetch('/api/key-status').then(r => r.json());
 
   if (hasKey) {
-    // Key is in .env — test it automatically
     await testKey(null);
   } else {
     dot.className = '';
@@ -56,8 +65,7 @@ async function checkKeyStatus() {
       userApiKey = input.value.trim();
       if (!userApiKey) return;
       await testKey(userApiKey);
-      const dot = document.getElementById('key-dot');
-      if (dot.classList.contains('connected')) {
+      if (document.getElementById('key-dot').classList.contains('connected')) {
         input.style.display = 'none';
         testBtn.style.display = 'none';
       }
@@ -77,21 +85,19 @@ function appendMessage(role, text) {
 }
 
 function appendChart(chartId, title) {
-  const feed    = document.getElementById('chat-messages');
-  const wrapper = document.createElement('div');
-  wrapper.className = 'msg assistant';
-
+  const feed     = document.getElementById('chat-messages');
   const canvasId = `chart-${++canvasCounter}`;
+  const wrapper  = document.createElement('div');
+  wrapper.className = 'msg assistant';
   wrapper.innerHTML = `
     <div class="msg-caption">${title}</div>
     <div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div>
   `;
-
   feed.appendChild(wrapper);
   feed.scrollTop = feed.scrollHeight;
 
-  // Chart.js needs the canvas to be in the DOM before init
-  CHARTS[chartId].init(canvasId);
+  // Canvas must be in the DOM before Chart.js init; data must be loaded first
+  withData(data => CHARTS[chartId].init(canvasId, data));
 }
 
 // ── Send ──────────────────────────────────────────────────────────────────────
@@ -133,9 +139,12 @@ async function sendMessage(prompt) {
 document.addEventListener('DOMContentLoaded', () => {
   checkKeyStatus();
 
+  // Pre-load CSV data in the background so first chart render is instant
+  withData(() => {});
+
   document.getElementById('chat-form').addEventListener('submit', e => {
     e.preventDefault();
-    const input = document.getElementById('chat-input');
+    const input  = document.getElementById('chat-input');
     const prompt = input.value.trim();
     if (!prompt) return;
     input.value = '';

@@ -6,21 +6,22 @@ How this project is structured and how each piece works. Updated after every mea
 
 ## What This Is
 
-A chat-driven data visualization tool. Type a natural-language prompt, get a chart back. A Node/Express server proxies prompts to Claude, which returns a chart ID. The frontend renders the matching hardcoded chart in the chat thread.
+A chat-driven data visualization tool. Type a natural-language prompt, get a chart back. A Node/Express server proxies prompts to Claude, which returns a chart ID. The frontend loads real CSV data via PapaParse and renders the matching chart in the chat thread.
 
-**Stack:** Node.js + Express · Anthropic API (Claude) · Chart.js 4.4.7 (CDN) · Vanilla JS frontend
+**Stack:** Node.js + Express · Anthropic API (Claude) · Chart.js 4.4.7 · PapaParse 5 · Vanilla JS
 
 ---
 
-## Current State: Iteration 4
+## Current State: Iteration 5
 
-Three hardcoded charts, routed by LLM:
+Four charts, all driven by live CSV data:
 
-| chart_id    | Chart type        | Description                                  |
-|-------------|-------------------|----------------------------------------------|
-| `pie`       | Pie               | Industry breakdown of top 100 SaaS companies |
-| `scatter`   | Scatter (log)     | Founded year vs. valuation                   |
-| `investors` | Horizontal bar    | Most frequent investors by portfolio count   |
+| chart_id      | Chart type     | Description                                |
+|---------------|----------------|--------------------------------------------|
+| `pie`         | Pie            | Industry breakdown — computed from CSV     |
+| `scatter`     | Scatter (log Y)| Founded year vs. valuation                 |
+| `investors`   | Horizontal bar | Top 15 investors by portfolio count        |
+| `arr-scatter` | Scatter (log)  | ARR vs. valuation, both axes log scale     |
 
 ---
 
@@ -28,24 +29,23 @@ Three hardcoded charts, routed by LLM:
 
 ```
 companydataviz/
-├── server.js                        # Express server + /api/chat route
-├── .env                             # ANTHROPIC_API_KEY (gitignored)
-├── .env.example                     # Template for .env
-├── package.json                     # npm config, "start": "node server.js"
-├── public/                          # Static files served by Express
-│   ├── index.html                   # Chat UI
-│   ├── main.js                      # Chat logic, API calls, chart rendering
-│   ├── charts/
-│   │   ├── industryPie.js           # initIndustryPie(canvasId)
-│   │   ├── foundedValuationScatter.js # initFoundedValuationScatter(canvasId)
-│   │   └── investorBar.js           # initInvestorBar(canvasId)
-│   ├── scatter.html                 # Standalone scatter (dev/testing)
-│   └── investors.html               # Standalone investor bar (dev/testing)
-├── iterative_specs/                 # Per-iteration build specs
-├── test_outputs/                    # Screenshots for visual QA
-├── data_verification.md             # SQL + expected output for each chart
-├── CODEBASE.md                      # This file
-└── README.md                        # Project overview
+├── server.js                          # Express server + API routes
+├── .env                               # ANTHROPIC_API_KEY (gitignored)
+├── .env.example                       # Template for .env
+├── package.json                       # npm config — "start": "node server.js"
+├── input_data/                        # Source CSV (not served directly)
+└── public/                            # Everything served as static files
+    ├── index.html                     # Chat UI shell
+    ├── main.js                        # Chat logic, data loading, chart rendering
+    ├── data.js                        # CSV loader + currency normalizer
+    ├── companies.csv                  # The dataset (copied from input_data/)
+    ├── charts/
+    │   ├── industryPie.js             # initIndustryPie(canvasId, data)
+    │   ├── foundedValuationScatter.js # initFoundedValuationScatter(canvasId, data)
+    │   ├── investorBar.js             # initInvestorBar(canvasId, data)
+    │   └── arrValuationScatter.js     # initArrValuationScatter(canvasId, data)
+    ├── scatter.html                   # Standalone scatter (dev/testing)
+    └── investors.html                 # Standalone investor bar (dev/testing)
 ```
 
 ---
@@ -55,56 +55,69 @@ companydataviz/
 ### Running the app
 
 ```bash
-cp .env.example .env      # add your key
+cp .env.example .env      # add your Anthropic key
 npm install
 npm start                 # http://localhost:3000
 ```
 
 ### `server.js`
 
-Two routes:
+Three routes:
+- **`GET /api/key-status`** — returns `{ hasKey: bool }` so the UI knows whether to show the key input.
+- **`GET /api/test-key`** — makes a real 1-token ping to Anthropic (using Haiku) to verify the key actually works, not just that it exists.
+- **`POST /api/chat`** — takes `{ message }`, calls Claude with the routing system prompt, returns `{ chart, title }`.
 
-- **`GET /api/key-status`** — returns `{ hasKey: true/false }` so the frontend knows whether to show the key input field.
-- **`POST /api/chat`** — takes `{ message }`, calls the Anthropic Messages API with a routing system prompt, returns `{ chart, title }`.
+API key priority: `req.headers['x-api-key']` (user-pasted) → `process.env.ANTHROPIC_API_KEY` (.env).
 
-API key priority: `req.headers['x-api-key']` (user-pasted in UI) falls back to `process.env.ANTHROPIC_API_KEY` (`.env` file).
+Claude is instructed to respond with only `{ "chart": "<id>", "title": "<description>" }`. `max_tokens: 100` keeps costs minimal.
 
-The system prompt instructs Claude to respond with only a JSON object: `{ "chart": "<chart_id>", "title": "<description>" }`. `max_tokens: 100` keeps the call cheap — the response is never more than one small JSON object.
+### `public/data.js`
 
-Claude's raw response is in `data.content[0].text`. This is JSON-parsed and forwarded to the frontend. If parsing fails, a graceful error message is returned.
+Two exports:
 
-### `public/index.html`
+**`parseCurrency(str)`** — normalizes all currency formats found in the CSV to a float in billions:
+- `$3T` → `3000`, `$270B` → `270`, `$400M` → `0.4`
+- `$27.7B (Salesforce)` → `27.7` (acquirer notes stripped)
+- `N/A` or blank → `null`
 
-Pure layout — chat header, scrollable message feed, fixed input bar. No logic. Loads Chart.js from CDN, then the three chart files, then `main.js`.
+**`loadData(callback)`** — fetches `/companies.csv` via PapaParse (`download: true, header: true`), normalizes each row, calls `callback(rows)`. Each row gets three computed fields added:
+- `arr_b` — ARR in billions (null if unparseable)
+- `valuation_b` — Valuation in billions (null if unparseable)
+- `founded_year` — integer (null if unparseable)
+
+Rows with bad values are **not dropped** — callers filter as needed per chart.
 
 ### `public/main.js`
 
-Three responsibilities:
+**Data:** `withData(callback)` ensures the CSV is loaded only once. On `DOMContentLoaded`, data is pre-fetched in the background so the first chart renders without waiting.
 
-**1. API key check** (`checkKeyStatus`)
-On load, hits `/api/key-status`. If no key is configured, shows a password input in the header. The user-pasted key is stored in `userApiKey` and sent as `x-api-key` on subsequent requests.
+**API key:** On load, checks `/api/key-status`. If no key, shows input + Test button. Test button hits `/api/test-key` — green dot on success, red on failure.
 
-**2. Message rendering** (`appendMessage`, `appendChart`)
-User messages appear as right-aligned blue bubbles. Assistant text responses appear as left-aligned white bubbles. Chart responses get a caption line (the `title` from Claude) above a fresh `<canvas>` in a white card.
+**Chat flow:** User submits prompt → POST `/api/chat` → parse `{ chart, title }` → if unknown chart, show title as text → otherwise call `appendChart()`.
 
-Each chart gets a unique canvas ID (`chart-1`, `chart-2`, …) via `canvasCounter`. This is required because Chart.js binds permanently to a canvas element — reusing the same canvas causes ghost rendering artifacts.
+**Chart rendering:** Each chart response creates a fresh `<canvas>` with a unique ID (`chart-1`, `chart-2`, …). Chart.js binds to a canvas permanently — reusing canvases causes ghost artifacts. `withData()` ensures the CSV is ready before the init function is called.
 
-**3. Send flow** (`sendMessage`)
-POST to `/api/chat` → parse `{ chart, title }` → if `chart === 'none'` or unknown, show title as text → otherwise call `CHARTS[chartId].init(canvasId)`.
-
-The `CHARTS` map connects each `chart_id` to its init function:
+**`CHARTS` map:**
 ```javascript
 const CHARTS = {
-  pie:       { init: (id) => initIndustryPie(id) },
-  scatter:   { init: (id) => initFoundedValuationScatter(id) },
-  investors: { init: (id) => initInvestorBar(id) },
+  pie:           { init: (id, data) => initIndustryPie(id, data) },
+  scatter:       { init: (id, data) => initFoundedValuationScatter(id, data) },
+  investors:     { init: (id, data) => initInvestorBar(id, data) },
+  'arr-scatter': { init: (id, data) => initArrValuationScatter(id, data) },
 };
 ```
-Adding a new chart = new entry here + new chart file in `public/charts/`.
+Adding a new chart = new entry here + new file in `public/charts/`.
 
 ### `public/charts/*.js`
 
-Unchanged from iteration 3. Each file exposes one `initXxx(canvasId)` function that builds a Chart.js config and returns the instance. See earlier sections of this doc for per-chart details.
+Each chart function signature: `initXxx(canvasId, data)` — receives the full normalized row array, filters/transforms what it needs, returns a Chart.js instance.
+
+| File | Data used | Key logic |
+|---|---|---|
+| `industryPie.js` | `Industry` column | Buckets into top 5 + Other; computes counts dynamically |
+| `foundedValuationScatter.js` | `founded_year`, `valuation_b` | Filters `valuation_b > 0`; deterministic x-jitter via char sum |
+| `investorBar.js` | `Top Investors` column | Splits comma-separated investors, counts frequency, top 15 |
+| `arrValuationScatter.js` | `arr_b`, `valuation_b` | Filters both > 0; both axes logarithmic |
 
 ---
 
@@ -112,17 +125,9 @@ Unchanged from iteration 3. Each file exposes one `initXxx(canvasId)` function t
 
 | Decision | Reason |
 |---|---|
-| LLM call goes through the server, never the browser | Anthropic API blocks browser requests via CORS |
-| `max_tokens: 100` | Response is always a tiny JSON object — no need to pay for more |
-| Fresh canvas per chat response | Chart.js binds to a canvas permanently; reusing causes ghost artifacts |
-| `canvasCounter` for unique IDs | Simple, zero-dependency way to guarantee unique canvas IDs per session |
-| `x-api-key` header fallback | Lets evaluators paste their own key without touching `.env` |
-| `.env.example` committed, `.env` gitignored | Documents required config without exposing secrets |
-
----
-
-## What Comes Next
-
-1. Load real data from CSV using PapaParse (replace hardcoded arrays)
-2. Build a `renderChart(canvasId, config)` generic renderer driven by a JSON spec
-3. Have Claude generate full chart specs (data + config) rather than just routing to hardcoded charts
+| CSV loaded once, passed as argument | No per-chart fetching; all charts share the same parsed data |
+| `parseCurrency` strips acquirer notes | Raw CSV contains values like `$27.7B (Salesforce)` — notes are metadata, not part of the number |
+| Rows flagged but not dropped in loader | Each chart has different validity requirements; filtering at the chart level is more explicit |
+| LLM call server-side only | Anthropic API blocks browser requests via CORS |
+| Fresh canvas per chat response | Chart.js permanently binds to a canvas element |
+| `max_tokens: 100` on routing call | Response is always a small JSON object |

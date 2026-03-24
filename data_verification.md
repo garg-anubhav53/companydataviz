@@ -72,7 +72,7 @@ SELECT
     WHEN valuation_billions >= 1000 THEN ROUND(valuation_billions / 1000.0, 1) || 'T'
     ELSE valuation_billions || 'B'
   END AS valuation_display
-FROM companies
+FROM data
 WHERE valuation_billions IS NOT NULL
 ORDER BY valuation_billions DESC;
 ```
@@ -127,7 +127,7 @@ SELECT
   ci.investor_name,
   COUNT(DISTINCT ci.company_name)                              AS portfolio_count,
   STRING_AGG(ci.company_name, ', ' ORDER BY ci.company_name)  AS portfolio_companies
-FROM company_investors ci
+FROM data ci
 GROUP BY ci.investor_name
 ORDER BY portfolio_count DESC
 LIMIT 15;
