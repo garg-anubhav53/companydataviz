@@ -29,35 +29,6 @@
     <canvas id="chart"></canvas>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script>
-    new Chart(document.getElementById('chart'), {
-      type: 'pie',
-      data: {
-        labels: ["Work Management", "Enterprise Software", "Database", "Communications", "Payments", "Other"],
-        datasets: [{
-          data: [3, 2, 2, 2, 2, 89],
-          backgroundColor: [
-            '#4e79a7',
-            '#f28e2b',
-            '#e15759',
-            '#76b7b2',
-            '#59a14f',
-            '#b0b0b0'
-          ]
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          title: {
-            display: true,
-            text: 'Industry Breakdown — Top 100 SaaS Companies',
-            font: { size: 16 }
-          },
-          legend: { position: 'right' }
-        }
-      }
-    });
-  </script>
+  <script src="charts/industryPie.js"></script>
 </body>
 </html>
