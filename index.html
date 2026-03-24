@@ -3,32 +3,89 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Industry Breakdown — Top 100 SaaS Companies</title>
+  <title>SaaS Company Data Viz</title>
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+      padding: 24px;
       background: #f5f5f5;
       font-family: sans-serif;
+      min-height: 100vh;
     }
+
+    h1 {
+      text-align: center;
+      font-size: 1.25rem;
+      color: #333;
+      margin: 0 0 20px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .tab-btn {
+      padding: 8px 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #555;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .tab-btn:hover {
+      background: #e8e8e8;
+    }
+
+    .tab-btn.active {
+      background: #4e79a7;
+      color: white;
+      border-color: #4e79a7;
+    }
+
     .chart-container {
       background: white;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       padding: 24px;
-      max-width: 700px;
-      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .tab-panel.hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <div class="chart-container">
-    <canvas id="chart"></canvas>
+  <h1>Top 100 SaaS Companies</h1>
+
+  <div class="tabs">
+    <button class="tab-btn" data-tab="pie">Industry Breakdown</button>
+    <button class="tab-btn" data-tab="scatter">Valuation vs. Founded Year</button>
   </div>
+
+  <div class="chart-container">
+    <div class="tab-panel" data-tab="pie">
+      <canvas id="pie-canvas"></canvas>
+    </div>
+    <div class="tab-panel hidden" data-tab="scatter">
+      <canvas id="scatter-canvas"></canvas>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="charts/industryPie.js"></script>
+  <script src="charts/foundedValuationScatter.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
